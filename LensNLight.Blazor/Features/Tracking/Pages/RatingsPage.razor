@@ -1,0 +1,119 @@
+@namespace LensNLight.Blazor.Features.Tracking.Pages
+@page "/ratings"
+@inject ICameraCatalogService Catalog
+
+<PageTitle>Ratings | LENS N' LIGHT</PageTitle>
+
+<div class="customer-page ratings-page">
+    <SiteHeader />
+    <main class="ratings-frame" id="main-content">
+        <section class="ratings-hero" aria-labelledby="ratings-title">
+            <div>
+                <p class="eyebrow">Your experience matters</p>
+                <h1 id="ratings-title">Rate your rental.</h1>
+                <p>Help us make every camera rental better. Share a rating and a few words about your experience.</p>
+            </div>
+            <aside class="ratings-note">
+                <span class="ratings-note-mark" aria-hidden="true">✦</span>
+                <strong>Every perspective counts</strong>
+                <p>Your feedback is saved in this page preview only.</p>
+            </aside>
+        </section>
+
+        <div class="ratings-layout">
+            <section class="rating-form-card" aria-labelledby="rating-form-title">
+                <div class="rating-section-heading">
+                    <span class="rating-step">01</span>
+                    <div><h2 id="rating-form-title">How was your rental?</h2><p>Choose the camera and leave an honest review.</p></div>
+                </div>
+
+                <form @onsubmit="SubmitRating" @onsubmit:preventDefault>
+                    <label class="rating-label" for="rating-camera">Camera rented</label>
+                    <select id="rating-camera" @bind="SelectedCamera">
+                        <option value="">Select a camera</option>
+                        @foreach (var camera in Cameras)
+                        {
+                            <option value="@camera.Name">@camera.Name</option>
+                        }
+                    </select>
+
+                    <fieldset class="star-fieldset">
+                        <legend class="rating-label">Your rating</legend>
+                        <div class="star-picker" role="group" aria-label="Choose a rating from one to five stars">
+                            @for (var star = 1; star <= 5; star++)
+                            {
+                                var selectedStar = star;
+                                <button class="star-choice @(star <= Rating ? "selected" : "")" type="button" aria-label="@star star@(star == 1 ? "" : "s")" aria-pressed="@(Rating == star)" @onclick="() => Rating = selectedStar">★</button>
+                            }
+                        </div>
+                        <span class="rating-hint">@(Rating == 0 ? "Tap a star to rate" : RatingLabel)</span>
+                    </fieldset>
+
+                    <label class="rating-label" for="rating-review">Your review <span>Optional</span></label>
+                    <textarea id="rating-review" rows="5" maxlength="500" placeholder="What did you enjoy? Anything we could improve?" @bind="ReviewText" @bind:event="oninput"></textarea>
+                    <div class="rating-form-footer"><small>@ReviewText.Length / 500</small><button class="primary-action" type="submit" disabled="@(!CanSubmit)">Submit rating <span aria-hidden="true">→</span></button></div>
+                    @if (!string.IsNullOrWhiteSpace(FormMessage))
+                    {
+                        <p class="rating-form-message" role="status">@FormMessage</p>
+                    }
+                </form>
+            </section>
+
+            <aside class="ratings-side-card">
+                <p class="card-eyebrow">A little goes a long way</p>
+                <h2>Better rentals start with your feedback.</h2>
+                <p>Your rating helps us understand what worked well, from the gear to the pickup experience.</p>
+                <div class="ratings-side-detail"><span aria-hidden="true">✦</span><div><strong>Quick and simple</strong><small>A star rating is all you need to get started.</small></div></div>
+                <div class="ratings-side-detail"><span aria-hidden="true">↗</span><div><strong>Useful for the team</strong><small>Tell us what made your rental easier or better.</small></div></div>
+                <a class="ratings-track-link" href="/track-booking">Need a booking update? <span>Track booking →</span></a>
+            </aside>
+        </div>
+
+        @if (SubmittedRatings.Count > 0)
+        {
+            <section class="submitted-ratings" aria-labelledby="submitted-ratings-title">
+                <div class="rating-section-heading"><span class="rating-step">02</span><div><h2 id="submitted-ratings-title">Your page preview</h2><p>Ratings submitted in this session.</p></div></div>
+                @foreach (var review in SubmittedRatings)
+                {
+                    <article class="submitted-rating-card">
+                        <div><strong>@review.Camera</strong><span class="review-stars" aria-label="@review.Score out of 5 stars">@(new string('★', review.Score))</span></div>
+                        @if (!string.IsNullOrWhiteSpace(review.Text)) { <p>@review.Text</p> }
+                        else { <p class="rating-no-comment">Rating submitted without a written review.</p> }
+                        <small>Just now · Local preview</small>
+                    </article>
+                }
+            </section>
+        }
+    </main>
+    <SiteFooter />
+</div>
+
+@code {
+    private IReadOnlyList<CameraItem> Cameras { get; set; } = [];
+    private List<SubmittedRating> SubmittedRatings { get; } = [];
+    private string SelectedCamera { get; set; } = string.Empty;
+    private string ReviewText { get; set; } = string.Empty;
+    private string FormMessage { get; set; } = string.Empty;
+    private int Rating { get; set; }
+    private bool CanSubmit => Rating > 0 && !string.IsNullOrWhiteSpace(SelectedCamera);
+    private string RatingLabel => Rating switch { 1 => "Needs improvement", 2 => "Fair", 3 => "Good", 4 => "Very good", 5 => "Excellent", _ => "Tap a star to rate" };
+
+    protected override void OnInitialized() => Cameras = Catalog.GetAll();
+
+    private void SubmitRating()
+    {
+        if (!CanSubmit)
+        {
+            FormMessage = "Choose a camera and select a star rating to continue.";
+            return;
+        }
+
+        SubmittedRatings.Insert(0, new(SelectedCamera, Rating, ReviewText.Trim()));
+        FormMessage = "Thanks for sharing your feedback. It has been added to this local preview.";
+        Rating = 0;
+        ReviewText = string.Empty;
+        SelectedCamera = string.Empty;
+    }
+
+    private sealed record SubmittedRating(string Camera, int Score, string Text);
+}
